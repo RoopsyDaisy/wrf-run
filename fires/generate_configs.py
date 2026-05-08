@@ -11,6 +11,8 @@ from typing import Dict, Tuple
 
 import yaml
 
+from settings import load_settings, render
+
 
 IOFIELDS_FILENAME = "iofields_fire.txt"
 IOFIELDS_CONTENT = """# Keep only these fields in wrfout (history output)
@@ -72,13 +74,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--workflow-root",
-        default="/glade/derecho/scratch/ljaeger/workflow",
-        help="Remote workflow root used inside configs.",
+        default=None,
+        help="Remote workflow root used inside configs (default: <scratch_root>/workflow).",
     )
     parser.add_argument(
         "--grib-root",
-        default="/glade/derecho/scratch/ljaeger/data/hrrr",
-        help="Remote GRIB root used inside configs.",
+        default=None,
+        help="Remote GRIB root used inside configs (default: <scratch_root>/data/hrrr).",
     )
     parser.add_argument(
         "--overwrite",
@@ -167,7 +169,13 @@ def update_wrf_namelist_iofields(namelist_path: Path, iofields_filename: str) ->
 
 
 def copy_wrf_template(
-    template_dir: Path, dest_dir: Path, lat: float, lon: float, fire_id: str, overwrite: bool
+    template_dir: Path,
+    dest_dir: Path,
+    lat: float,
+    lon: float,
+    fire_id: str,
+    overwrite: bool,
+    settings: Dict[str, str],
 ) -> None:
     if dest_dir.exists():
         if overwrite:
@@ -176,6 +184,17 @@ def copy_wrf_template(
             raise SystemExit(f"Destination {dest_dir} already exists (use --overwrite to replace).")
 
     shutil.copytree(template_dir, dest_dir)
+    for path in dest_dir.rglob("*"):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text()
+        except UnicodeDecodeError:
+            continue
+        rendered = render(text, settings)
+        if rendered != text:
+            path.write_text(rendered)
+
     namelist = dest_dir / "namelist.wps.hrrr"
     if namelist.exists():
         update_wps_namelist(namelist, lat, lon, fire_id)
@@ -209,12 +228,13 @@ def write_workflow_config(dest_path: Path, config: Dict[str, object]) -> None:
 
 
 def generate_configs(args: argparse.Namespace) -> Tuple[int, Path]:
+    settings = load_settings()
     fire_meta = load_fire_metadata(args.runs_csv)
-    with args.workflow_template.open("r") as handle:
-        template_yaml = yaml.safe_load(handle) or {}
+    template_text = render(args.workflow_template.read_text(), settings)
+    template_yaml = yaml.safe_load(template_text) or {}
 
-    workflow_root = Path(args.workflow_root)
-    grib_root = Path(args.grib_root)
+    workflow_root = Path(args.workflow_root or settings["workflow_root"])
+    grib_root = Path(args.grib_root or settings["grib_root"])
     workflow_out_dir = args.output_dir / "workflow"
     wrf_out_dir = args.output_dir / "wrf"
     wrf_out_dir.mkdir(parents=True, exist_ok=True)
@@ -223,7 +243,15 @@ def generate_configs(args: argparse.Namespace) -> Tuple[int, Path]:
         lat = float(fields["latitude"])
         lon = float(fields["longitude"])
         fire_template_dir = wrf_out_dir / fire_id
-        copy_wrf_template(args.wrf_template_dir, fire_template_dir, lat, lon, fire_id, args.overwrite)
+        copy_wrf_template(
+            args.wrf_template_dir,
+            fire_template_dir,
+            lat,
+            lon,
+            fire_id,
+            args.overwrite,
+            settings,
+        )
 
         cfg = render_workflow_config(template_yaml, fire_id, fire_template_dir, workflow_root, grib_root)
         dest_config = workflow_out_dir / f"{fire_id}.yaml"

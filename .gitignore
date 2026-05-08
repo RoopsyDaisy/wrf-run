@@ -1,5 +1,7 @@
 configs/built/
 configs/save/
+configs/settings.yaml
+docs/rupert_notes.md
 compression/
 *.nc
 *.tif

@@ -1,0 +1,15 @@
+# Per-user / per-environment settings for wrf-run.
+# Copy this file to configs/settings.yaml (gitignored) and edit the values.
+#
+# All workflow templates use {{ user }}, {{ project }}, {{ home_root }}, and
+# {{ scratch_root }} placeholders that get rendered by fires/generate_configs.py
+# at config-generation time.
+
+user: CHANGE_ME           # Your NCAR HPC username (e.g. rupertw)
+project: CHANGE_ME        # Your NCAR project number from sam.ucar.edu (e.g. P48500047)
+
+# Optional explicit overrides — leave commented out to derive from `user`.
+# home_root: /glade/u/home/CHANGE_ME
+# scratch_root: /glade/derecho/scratch/CHANGE_ME
+# workflow_root: /glade/derecho/scratch/CHANGE_ME/workflow
+# grib_root: /glade/derecho/scratch/CHANGE_ME/data/hrrr
