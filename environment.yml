@@ -17,3 +17,6 @@ dependencies:
   - ipykernel
   - cartopy
   - gh
+  - pip
+  - pip:
+      - wget
