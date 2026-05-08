@@ -278,21 +278,28 @@ def main(cycle_dt_beg, sim_hrs, wps_dir, run_dir, out_dir, ungrib_dir, tmp_dir, 
         log.info('WARNING: check_jobs_status.sh needs to be modified to handle PBS calls')
 
     ## Monitor the progress of metgrid
+    # WPS-4.6 cmake build writes a unified 'metgrid.log'; older autoconf builds write 'metgrid.log.0000'.
+    # Success scan checks both. Error scan stays on the original set because the unified log can contain
+    # transient ERROR strings (e.g. ext_pkg_open_for_write_begin) during recoverable operations.
+    metgrid_log_candidates = ('metgrid.log.0000', 'metgrid.log')
     status = False
     while not status:
-        if not pathlib.Path('metgrid.log.0000').is_file() or not pathlib.Path(job_log_filename).is_file():
+        if (not any(pathlib.Path(c).is_file() for c in metgrid_log_candidates)
+                or not pathlib.Path(job_log_filename).is_file()):
             time.sleep(long_time)
         else:
             log.info('metgrid is now running on the cluster . . .')
             status = True
     status = False
     while not status:
-        if search_file(str(run_dir) + '/metgrid.log.0000', '*** Successful completion of program metgrid.exe ***'):
+        if any(search_file(str(run_dir) + '/' + c, '*** Successful completion of program metgrid.exe ***')
+                for c in metgrid_log_candidates if (run_dir / c).is_file()):
             log.info('SUCCESS! metgrid completed successfully.')
             time.sleep(short_time)  # brief pause to let the file system gather itself
             status = True
         else:
-            # May need to add more error message patterns to search for
+            # Error scan: only look at the original files (job logs + the rank-0 log when present),
+            # NOT the unified metgrid.log which may contain transient/recoverable error strings.
             fnames = ['metgrid.log.0000', job_log_filename, job_err_filename]
             patterns = ['FATAL', 'Fatal', 'ERROR', 'Error', 'BAD TERMINATION', 'forrtl:', 'unrecognized option']
             for fname in fnames:

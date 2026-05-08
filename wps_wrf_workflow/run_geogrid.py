@@ -145,21 +145,28 @@ def main(wps_dir, run_dir, tmp_dir, nml_tmp, scheduler, hostname):
 	time.sleep(long_time)	# give the file system a moment
 
 	## Monitor the progress of geogrid
+	# WPS-4.6 cmake build writes a unified 'geogrid.log'; older autoconf builds write 'geogrid.log.0000'.
+	# Success scan checks both. Error scan stays on the original set because the unified log can contain
+	# transient ERROR strings during recoverable operations (mirrors run_metgrid.py).
+	geogrid_log_candidates = ('geogrid.log.0000', 'geogrid.log')
 	status = False
 	while not status:
-		if not pathlib.Path('geogrid.log.0000').is_file() and not pathlib.Path('log_geogrid.o'+jobid).is_file():
+		if (not any(pathlib.Path(c).is_file() for c in geogrid_log_candidates)
+				and not pathlib.Path('log_geogrid.o'+jobid).is_file()):
 			time.sleep(long_time)
 		else:
 			log.info('geogrid is now running on the cluster . . .')
 			status = True
 	status = False
 	while not status:
-		if search_file(str(run_dir) + '/geogrid.log.0000', '*** Successful completion of program geogrid.exe ***'):
+		if any(search_file(str(run_dir) + '/' + c, '*** Successful completion of program geogrid.exe ***')
+				for c in geogrid_log_candidates if (run_dir / c).is_file()):
 			log.info('SUCCESS! geogrid completed successfully.')
 			time.sleep(short_time)  # brief pause to let the file system gather itself
 			status = True
 		else:
-			# May need to add more error message patterns to search for
+			# Error scan: only look at the original files (rank-0 log + job logs), NOT the
+			# unified geogrid.log which may contain transient/recoverable error strings.
 			fnames = ['geogrid.log.0000', job_log_filename, job_err_filename]
 			patterns = ['FATAL', 'Fatal', 'ERROR', 'Error', 'BAD TERMINATION', 'forrtl:', 'unrecognized option']
 			for fname in fnames:
