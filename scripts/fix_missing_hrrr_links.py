@@ -93,7 +93,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--tmp-dir",
         type=Path,
-        default=Path("/glade/derecho/scratch/ljaeger/tmp/hrrr_interp"),
+        default=Path(f"/glade/derecho/scratch/{os.environ['USER']}/tmp/hrrr_interp"),
         help="Temporary directory for neighbor downloads.",
     )
     parser.add_argument(

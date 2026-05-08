@@ -1,5 +1,5 @@
-SCR="/glade/derecho/scratch/ljaeger/workflow"
-WRK="/glade/work/ljaeger/wrfout/fire"
+SCR="/glade/derecho/scratch/$USER/workflow"
+WRK="/glade/work/$USER/wrfout/fire"
 
 find "$SCR"/fire_* -path "*/wrf/*/wrfout_*" | shuf -n 20 | while read -r src; do
   fire=$(basename "$(dirname "$(dirname "$(dirname "$src")")")")

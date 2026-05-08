@@ -1,1 +1,1 @@
-rm -rf /glade/derecho/scratch/ljaeger/data/hrrr/*
+rm -rf /glade/derecho/scratch/$USER/data/hrrr/*
