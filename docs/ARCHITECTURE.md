@@ -18,7 +18,7 @@ The core workflow is:
    - metgrid
    - real
    - wrf
-6. Write outputs to scratch under `/glade/derecho/scratch/ljaeger/workflow/<fire_id>/`.
+6. Write outputs to scratch under `/glade/derecho/scratch/<user>/workflow/<fire_id>/`.
 
 The two most important entry points are:
 
@@ -62,9 +62,9 @@ This script:
 
 The workflow YAML sets the main storage roots:
 
-- `wps_run_dir`: `/glade/derecho/scratch/ljaeger/workflow/<fire_id>/wps`
-- `wrf_run_dir`: `/glade/derecho/scratch/ljaeger/workflow/<fire_id>/wrf`
-- `grib_dir`: `/glade/derecho/scratch/ljaeger/data/hrrr`
+- `wps_run_dir`: `/glade/derecho/scratch/<user>/workflow/<fire_id>/wps`
+- `wrf_run_dir`: `/glade/derecho/scratch/<user>/workflow/<fire_id>/wrf`
+- `grib_dir`: `/glade/derecho/scratch/<user>/data/hrrr`
 
 ### 3. Cycle orchestration
 
@@ -240,14 +240,10 @@ and can archive selected outputs if `archive: true` is enabled in the YAML.
 
 ### Day-level control and reporting
 
-- `scripts/run_budget_parallel.sh`
+- `./run.sh`
   - Launches multiple `run_budget_day.py` day indices in parallel with queue throttling
-- `fires/report_stage_counts.py`
-  - Scans the budget CSV plus scratch directories and reports which stage each run has reached
 - `fires/cleanup_day.py`
   - Cleanup helper used after successful day runs
-- `fires/report_day_status.py`
-  - Status reporting around daily runs
 
 ### Inputs and generated artifacts
 
@@ -269,7 +265,7 @@ The workflow writes to scratch, not into the repo.
 Main tree:
 
 ```text
-/glade/derecho/scratch/ljaeger/workflow/
+/glade/derecho/scratch/<user>/workflow/
   fire_<id>/
     wps/
       geogrid/
@@ -308,7 +304,7 @@ python fires/run_budget_day.py --day-index N --start-fire M
 Run several days in parallel with queue throttling:
 
 ```bash
-scripts/run_budget_parallel.sh --max-days 10 --max-jobs 400 668 669 670
+./run.sh --max-days 10 --max-jobs 400 668 669 670
 ```
 
 Generate configs:
@@ -317,28 +313,17 @@ Generate configs:
 python fires/generate_configs.py
 ```
 
-Inspect stage completion across the budget CSV:
+## Active vs. legacy code
 
-```bash
-python fires/report_stage_counts.py
-```
-
-## What is current vs. older
-
-These files appear to be older or less central than the current fire workflow:
-
-- `fires/run.py`
-  - Older CSV command runner based on a `command` column
-- `fires/main.py`
-  - Older config/bootstrap script for a different directory layout
-- `fires/runs.py`
-  - Small ad hoc launcher script
-
-The current repo center of gravity is:
+The current center of gravity is:
 
 - `fires/run_budget_day.py`
 - `fires/generate_configs.py`
 - `wps_wrf_workflow/setup_wps_wrf.py`
+
+The `misc/` directory contains historical helper scripts (older command runners,
+ad-hoc launchers, one-off reports). They are not part of the active workflow
+and should be audited or pruned over time.
 
 ## Where to start reading
 
