@@ -203,6 +203,53 @@ The run is "done" when `wrfout_d0*` count >= 12 (configurable via
 - **Scratch quota** — you need ~25 G of headroom for HRRR + WPS + WRF outputs
   per day. `gladequota` shows current usage.
 
+## Disaster recovery / off-site backup
+
+The repo is on GitHub, but the `bin/` tree (2.9 GB of compiled WRF 4.6 / WPS 4.6
+binaries) is not — it lives only on NCAR. If Jeremy's original compile and our
+copy both disappear, the only path back is recompiling on both Derecho and
+Casper, which is a multi-day exercise. Keep a copy on the lab PC.
+
+What to back up:
+
+- `bin/` — the only critical asset. ~2.9 GB.
+- The repo — already on GitHub, but a mirror clone is cheap insurance.
+- Conda env snapshot — optional; `environment.exact.yml` is the lockfile.
+
+What **not** to back up: `/glade/work/wrfhelp/WPS_GEOG` (1.6 TB, NCAR maintains)
+or the HRRR cache (re-downloadable per run).
+
+### Pull onto the lab PC
+
+Run from the **lab PC**, with SSH access to Derecho configured.
+
+```bash
+LAB_BACKUP=/path/on/labpc/wrf-run-backup     # edit
+mkdir -p "$LAB_BACKUP"
+
+# bin/ tree — tar-over-SSH preserves symlinks
+ssh rupertw@derecho.hpc.ucar.edu \
+    'tar -C /glade/u/home/rupertw/wrf-run -czf - bin' \
+    > "$LAB_BACKUP/wrf-run-bin-$(date +%Y%m%d).tar.gz"
+
+# Repo mirror (refresh later with: git -C wrf-run.git remote update)
+git -C "$LAB_BACKUP" clone --mirror git@github.com:RoopsyDaisy/wrf-run.git wrf-run.git
+
+# Optional: conda env snapshot
+ssh rupertw@derecho.hpc.ucar.edu \
+    'module load conda && conda env export -p /glade/work/rupertw/conda-envs/workflow' \
+    > "$LAB_BACKUP/conda-workflow-$(date +%Y%m%d).yml"
+```
+
+### Restore on a fresh NCAR account
+
+```bash
+git clone git@github.com:RoopsyDaisy/wrf-run.git ~/wrf-run
+scp labpc:$LAB_BACKUP/wrf-run-bin-YYYYMMDD.tar.gz ~/
+tar -xzf ~/wrf-run-bin-YYYYMMDD.tar.gz -C ~/wrf-run/
+# Then continue from step 3 above (settings.yaml).
+```
+
 ## What's next
 
 - Read [docs/ARCHITECTURE.md](ARCHITECTURE.md) for how the workflow is wired

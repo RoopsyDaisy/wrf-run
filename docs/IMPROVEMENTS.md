@@ -47,7 +47,34 @@ rebuilds from `.exact.yml` ends up with a broken env.
 (which includes pip packages in the output). Or commit a separate
 `pip-requirements.txt`.
 
-### 4. Doc cross-ref linting
+### 4. Investigate `~ljaeger/trim.sh`
+
+**Context:** Lorn's home dir has `trim.sh` plus `trim_manifest_full.csv` (4.5 MB)
+and `trim_full.log` at `/glade/u/home/ljaeger/`. Looks like a post-hoc wrfout
+trimmer — likely the thing that actually shrinks output files (see #5). We
+never confirmed where it sits in his workflow (manual / cron / post-cleanup),
+and Lorn is no longer reachable.
+
+**Fix:** read the script and manifest, port whatever it does into
+`fires/` or `scripts/` before any multi-day production sweep. Until then,
+expect full ~190 MB / 220-var wrfout files and budget scratch accordingly.
+
+### 5. Verify `iofields_fire.txt` actually trims output
+
+**Context:** `iofields_fire.txt` is meant to limit which fields land in
+wrfout, but empirically every wrfout in both Lorn's and our scratch trees has
+the full 220 variables and `rsl.out.0000` shows "Problem reading
+iofields_fire.txt at line N" warnings for every line. Three possibilities:
+(a) format is silently broken and trimming happens downstream via `trim.sh`
+(see #4), (b) the `+VarName` syntax in `fires/generate_configs.py`'s
+`IOFIELDS_CONTENT` is wrong, (c) a different namelist switch is needed.
+
+**Fix:** check the WRF Registry / iofields docs for current syntax, fix
+`IOFIELDS_CONTENT` if wrong, and confirm by counting variables in a single
+test wrfout. If the file is decorative, document that and rely on the trim
+pipeline.
+
+### 6. Doc cross-ref linting
 
 **Context:** `docs/ARCHITECTURE.md` (formerly `misc/WORKFLOW_OVERVIEW.md`)
 referenced 7 files that don't exist in the repo. Stale references silently rot.
@@ -60,7 +87,7 @@ fails if any don't exist.
 
 ## Higher value, larger effort
 
-### 5. Parallel HRRR downloads
+### 7. Parallel HRRR downloads
 
 **Context:** `wps_wrf_workflow/download_hrrr_from_aws_or_gc.py` downloads one
 URL at a time. ~62 files per fire/day at ~10s each = 10+ minutes per fresh
@@ -70,7 +97,7 @@ fire/day, all sequential. Multi-day sweeps are bottlenecked by this.
 workers). The interp script (`scripts/fix_missing_hrrr_links.py`) already
 uses this pattern; pull the same trick upstream.
 
-### 6. Auto-trigger HRRR fill-in on missing files
+### 8. Auto-trigger HRRR fill-in on missing files
 
 **Context:** When AWS/GC is missing a HRRR file (10-20% of days per Lorn),
 the download script silently leaves a hole, the workflow proceeds, and WRF
@@ -81,7 +108,7 @@ exists to interpolate missing hours, but is run manually after the fact.
 and have `run_budget_day.py` automatically run the interp step before
 proceeding to WPS.
 
-### 7. Auto cleanup when scratch fills
+### 9. Auto cleanup when scratch fills
 
 **Context:** Lorn manually runs `fires/cleanup_day.py` when scratch fills up
 and jobs stop. Easy to forget, easy to lose progress.
@@ -91,7 +118,7 @@ and jobs stop. Easy to forget, easy to lose progress.
 them when usage exceeds a threshold (e.g., 80%). Carefully: must not delete
 in-progress runs.
 
-### 8. Audit and prune `misc/`
+### 10. Audit and prune `misc/`
 
 **Context:** `misc/` contains ~20 historical helper scripts (older command
 runners, ad-hoc reporting, HRRR rerun fixers). Some may still be useful;
@@ -105,7 +132,7 @@ Update `docs/ARCHITECTURE.md` accordingly.
 
 ## Lower priority / deferred
 
-### 9. Cleaner placeholders in `namelist.wps.hrrr`
+### 11. Cleaner placeholders in `namelist.wps.hrrr`
 
 **Context:** Lines 33, 37, and 40 contain values like
 `UM_WRF_1Dom1km` and `20250324_00` that *look* like real config but are
@@ -116,7 +143,7 @@ mistaken for production config and "corrected" wrongly.
 `<cycle>`) — but only after confirming `setup_wps_wrf.py` does string-replace
 on whatever literals it expects. Otherwise we break the workflow.
 
-### 10. Parameterize `scripts/alert_usage.sh`
+### 12. Parameterize `scripts/alert_usage.sh`
 
 **Context:** Has `lornjaeger@proton.me` hardcoded. Currently safe at rest
 (manual `while true` loop), but a footgun for the next operator who
@@ -125,7 +152,7 @@ forgets to edit before running.
 **Fix:** read email from `$ALERT_EMAIL` env var; if unset, log instead of
 mailing.
 
-### 11. Reduce coupling to JaredLee's `wps_wrf_workflow/`
+### 13. Reduce coupling to JaredLee's `wps_wrf_workflow/`
 
 **Context:** `wps_wrf_workflow/` is vendored upstream code. Several
 improvements above (bashrc-aware invocation, parallel downloads,
@@ -136,7 +163,7 @@ sys.executable for children) require either patching that code in-place
 current "vendored without changes" pattern. If yes, formally fork on GitHub
 and add a CHANGES log of our deltas.
 
-### 12. Multi-fire test in setup verification
+### 14. Multi-fire test in setup verification
 
 **Context:** `docs/SETUP.md` walks through 1 fire. The "share ungrib output
 between fires on the same day" code path in `run_budget_day.py` is therefore
@@ -144,3 +171,11 @@ untested by the setup smoke flow.
 
 **Fix:** add a 2-fire same-day test as the final step in SETUP.md so the
 shared-ungrib path is exercised before someone goes to production.
+
+### 15. Audit `notebooks/tldr.ipynb`
+
+**Context:** Inherited from Lorn with hardcoded `ljaeger` paths in code cells.
+Never run on Rupert's account, purpose unverified.
+
+**Fix:** open it, decide whether the analysis is still useful. If yes,
+parameterize the paths via `configs/settings.yaml`. If no, delete.
